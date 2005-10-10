@@ -1,6 +1,6 @@
 package Class::DBI::FormTools;
 
-use version; $VERSION = qv('0.0.1');
+use version; $VERSION = qv('0.0.2');
 
 use strict;
 use warnings;
