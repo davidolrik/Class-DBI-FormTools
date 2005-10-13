@@ -1,6 +1,6 @@
 package Class::DBI::FormTools;
 
-use version; $VERSION = qv('0.0.2');
+use version; $VERSION = qv('0.0.3');
 
 use strict;
 use warnings;
@@ -40,7 +40,7 @@ sub form_fieldname
         '|',
         'cdbi',
         $class,
-        (ref($self) && $self->id) ? $self->id : -($object_index),
+        (ref($self) && $self->id) ? $self->id : $object_index,
         $name,
     );
     
@@ -65,72 +65,152 @@ sub formdata_to_objects
     # Extract all cdbi fields
     my @cdbi_formkeys = grep { /^cdbi\|/ } keys %$formdata;
 
+    # Create a todo list with one entry for each unique objects
+    # So we can process them in reverse order of dependency
+    my %todolist;
+
     # Sort data into piles for later object creation/updating
-    my $sorted_data;
+    my $processes_data;
     foreach my $formkey ( @cdbi_formkeys ) {
         my ($prefix,$class,$id,$attribute) = split(/\|/,$formkey);
-        print "($prefix,$class,$id,$attribute)\n";
+        $processes_data->{$class}->{$id}->{'raw'}->{$attribute}
+            = $formdata->{$formkey};
 
-        $sorted_data->{$class}->{$id}->{$attribute} = $formdata->{$formkey};
+        # Save class name and id in the todo list (hash used to avoid dupes)
+        $todolist{"$class|$id"} = { class => $class, id => $id };
     }
-    warn('Sorted data: '.Dumper($sorted_data));
 
-    # The objects we want to return
+    # Flatten todo hash into a todolist array
+    my @todolist = values %todolist;
+    #warn('TODOLIST: '.Dumper(\@todolist));
+    #warn('FORMDATA: '.Dumper($processes_data));
+
+    # Build objects from form data
     my @objects;
-    foreach my $class ( keys %$sorted_data ) {
-        # FIXME -> Multiple primary key support missing
-        my @primary_keys = $class->columns('Primary');
+    foreach my $todo ( @todolist ) {
+        my $object = $self->_inflate_object(
+            $todo->{ 'id'    },
+            $todo->{ 'class' },
+            $processes_data,
+        );        
+        push(@objects,$object);
+    }
+        
+    return(@objects);
+}
 
-        foreach my $id (  keys %{ $sorted_data->{$class} }  ) {
-            warn("$id\n");
 
-            my $attributes = $sorted_data->{$class}->{$id};
+sub _inflate_object
+{
+    my ($self,$id,$class,$processed_data) = @_;
 
-            # Update existing object
-            my $object = $class->retrieve($primary_keys[0]->name => $id);
-            if ( $object ) {
-                $object->set(%$attributes);
-            }
-            # Object does not exist, create a new one
-            else {
-                $object = $class->create($attributes);
-            }
-            
-            push @objects, $object;
+    ## Fetch object
+
+    # Is this object allready retrieved?
+    my $object = $processed_data->{$class}->{$id}->{'object'};
+    
+    # No object? - Fetch existing object from database, and store it
+    unless  ( $object ) {
+        $object = $class->retrieve($id);
+        $processed_data->{$class}->{$id}->{'object'} = $object;
+    }
+
+    # Still no object?
+    unless ( $object ) {
+        $object = $class->create({});
+        $processed_data->{$class}->{$id}->{'object'} = $object;
+    }
+
+    ## Process has_a references
+    my @has_a_references = values %{ $class->meta_info->{'has_a'} };
+    foreach my $has_a ( @has_a_references ) {
+
+        my $foreign_class    = $has_a->foreign_class;
+        my $foreign_accessor = $has_a->accessor->accessor;
+        my $foreign_id       = $processed_data
+                               ->{$class}
+                               ->{$id}
+                               ->{'raw'}
+                               ->{$foreign_accessor}
+                               ;
+
+        # Do not create objects that do not exist
+        next unless $foreign_id;
+
+        # Inflate foreign object
+        my $foreign_object = $self->_inflate_object($foreign_id,
+                                                    $foreign_class,
+                                                    $processed_data,
+                                                    );            
+        # Store relation in current object
+        $object->$foreign_accessor($foreign_object);
+    }
+
+    ## Process has_many references
+
+
+    # Build list for attributes to skip
+    my %skip;
+    foreach my $meta_type ( keys %{ $class->meta_info } ) {
+        foreach my $attr ( keys %{ $class->meta_info->{$meta_type} } ) {
+            $skip{$attr} = 1;
         }
     }
 
-    
-    return(@objects);
+    # Store attributes
+    foreach my $attr ( keys %{$processed_data->{$class}->{$id}->{'raw'}} ) {
+        # Skip relations
+        next if exists($skip{$attr});
+
+        $object->set($attr => $processed_data
+                              ->{$class}
+                              ->{$id}
+                              ->{'raw'}
+                              ->{$attr});
+    }
+
+    return($object);
 }
 
 
 sub form_field
 {
-    my ($self,$name,$type,$options) = @_;
+    my ($self,$name,$type,$options,$local_oid,$default) = @_;
+
+    croak "Field '$name' does not exist for object ".ref($self)
+        unless $self->can($name);
 
     my $input;
 
-    if ( $type eq 'text' ) {
-        $input = $self->_form_field_text($name,$options);
+    if ( $type eq 'text' || $type eq 'hidden' ) {
+        $input = $self->_form_field_common($name, $type, $options,
+                                           $local_oid, $default);
     }
 
-    return($input->as_XML);
+    my $markup = $input->as_XML;
+    chomp($markup);
+
+    return($markup);
 }
 
 
-sub _form_field_text
+sub _form_field_common
 {
-    my ($self,$name,$options) = @_;
+    my ($self,$name,$type,$options,$local_oid,$default) = @_;
+
+    my $value = defined($default)   ? $default
+              : ref($self)          ? $self->get($name)
+              :                     q{}
+              ;
 
     my $input = HTML::Element->new(
         'input',
-        name  => $self->form_fieldname($name),
-        value => $self->get($name),
+        name  => $self->form_fieldname($name,$local_oid),
+        value => $value,
+        type  => $type,
     );
     return($input);
 }
-
 
 
 

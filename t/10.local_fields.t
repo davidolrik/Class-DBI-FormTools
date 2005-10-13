@@ -15,8 +15,8 @@ ok(Film->can('db_Main'), 'set_db()');
 is(Film->__driver, "SQLite", "Driver set correctly");
 
 # Create 2 test objects
-my $film1 = Film->create_test_film;
-my $film2 = Film->create_test_film;
+my $film1 = Film->create_test_object;
+my $film2 = Film->create_test_object;
 
 my $field_definition = qr{
     cdbi    # Prefix
@@ -69,11 +69,14 @@ my $formdata = {
     Film->form_fieldname('length',  2) => 99,
     Film->form_fieldname('comment', 2) => 'This is a comment',
 };
+print 'Formdata: '.Dumper($formdata);
 
 # Extract all 4 objects
 my @objects = Class::DBI::FormTools->formdata_to_objects($formdata);
-ok((grep { ref($_) eq 'Film' } @objects) == 4,
+ok((grep { ref($_) eq 'Film' } @objects) == 2,
    "formdata_to_objects: Ojects extracted");
+
+print 'Final objects: '.Dumper(\@objects);
 
 # Update objects
 foreach my $object ( @objects ) {
