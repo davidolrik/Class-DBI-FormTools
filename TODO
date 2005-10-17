@@ -1,3 +1,8 @@
++------+     +------+     +-------+
+| Film | --> | Role | <-- | Actor |
++------+     +------+     +-------+
+
+
 Relation n-m no extra stuff in link table
 =========================================
 Table Film
@@ -13,14 +18,17 @@ Table Actor
 
 
 $film->fieldname('actors',$person_id);
-$person->fieldname('films',$film_id);
-
-<input name="cdbi|Actor|film_id=1;person_id=2"
+<input name="cdbi|Role|film_id=1;person_id=2"
        value="Dummy value"
        type="text" />
++ $ hidden field
+
+
+$person->fieldname('films',$film_id);
 <input name="cdbi|Actor|film_id=1;person_id=2"
        value="1"
        type="hidden" />
+
 
 Will do: insert/update/delete actors (film_id,person_id) values (1,2);
 

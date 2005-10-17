@@ -21,11 +21,11 @@ my $film = Film->create_test_object;
 ### Create a form with 1 existing objects with one non existing releation
 my $formdata = {
     # The existing objects
-    $film->form_fieldname('title'       ) => 'Title',
-    $film->form_fieldname('length'      ) => 99,
-    $film->form_fieldname('comment'     ) => 'This is a comment',
-    $film->form_fieldname('location_id' ) => 'o2',
-    Location->form_fieldname('name','o2') => 'Somewhere',
+    $film->form_fieldname('title',       'o1') => 'Title',
+    $film->form_fieldname('length',      'o1') => 99,
+    $film->form_fieldname('comment',     'o1') => 'This is a comment',
+    $film->form_fieldname('location_id', 'o1') => 'o2',
+    Location->form_fieldname('name',     'o2') => 'Somewhere',
 };
 print 'Formdata: '.Dumper($formdata);
 

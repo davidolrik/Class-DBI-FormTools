@@ -23,25 +23,48 @@ use Data::Dumper;
 
 sub form_fieldname
 {
-    my ($self,$name,$object_index) = @_;
+    my ($self,$accessor,$object_id,$remote_object_ids) = @_;
 
     # Get class name
     my $class = ref $self || $self;
 
+    # Set default values
+    $remote_object_ids = {} unless $remote_object_ids;
+
     # Check args based on how we are called
     die join(qq{\n},
              "When calling form_fieldname as a class method on $class,",
-             "an object index must be specified"
+             "an object id must be specified"
              ) . "\n"
-       if !ref($self) && !$object_index;
+        if !ref($self) && !defined($object_id);
 
-   # Compute fieldname
-   my $fieldname = join(
+    my %has_a_attributes;
+    foreach my $attr ( keys %{ $class->meta_info->{'has_a'} } ) {
+        $has_a_attributes{$attr}
+            = $class->meta_info->{'has_a'}->{$attr};
+    }
+
+    ## Build primary key field
+    my $id_fields = {
+        %$remote_object_ids,
+    };
+
+    my @id_fields;
+    if ( keys %$id_fields ) {
+        @id_fields = map { $_.'='.$id_fields->{$_} } keys %$id_fields;
+    }
+    else {
+        push @id_fields, ( ref($self) ) ? $self->id : 'new';
+    }
+
+    # Compute fieldname
+    my $fieldname = join(
         '|',
         'cdbi',
+        $object_id,
         $class,
-        (ref($self) && $self->id) ? $self->id : $object_index,
-        $name,
+        join(q{;},@id_fields),
+        $accessor || '',
     );
     
     return($fieldname);
@@ -72,12 +95,19 @@ sub formdata_to_objects
     # Sort data into piles for later object creation/updating
     my $processes_data;
     foreach my $formkey ( @cdbi_formkeys ) {
-        my ($prefix,$class,$id,$attribute) = split(/\|/,$formkey);
-        $processes_data->{$class}->{$id}->{'raw'}->{$attribute}
-            = $formdata->{$formkey};
+        my ($prefix,$object_id,$class,$id,$attribute) = split(/\|/,$formkey);
 
-        # Save class name and id in the todo list (hash used to avoid dupes)
-        $todolist{"$class|$id"} = { class => $class, id => $id };
+        $processes_data->{$class}->{$object_id}->{'raw'}->{$attribute}
+            = $formdata->{$formkey};
+        $processes_data->{$class}->{$object_id}->{'form_id'}
+            = $id;
+
+        # Save class name and id in the todo list
+        # (hash used to avoid dupes)
+        $todolist{"$class|$object_id"} = {
+            class     => $class,
+            object_id => $object_id,
+        };
     }
 
     # Flatten todo hash into a todolist array
@@ -89,8 +119,8 @@ sub formdata_to_objects
     my @objects;
     foreach my $todo ( @todolist ) {
         my $object = $self->_inflate_object(
-            $todo->{ 'id'    },
-            $todo->{ 'class' },
+            $todo->{ 'object_id' },
+            $todo->{ 'class'     },
             $processes_data,
         );        
         push(@objects,$object);
@@ -102,80 +132,101 @@ sub formdata_to_objects
 
 sub _inflate_object
 {
-    my ($self,$id,$class,$processed_data) = @_;
+    my ($self,$object_id,$class,$processed_data) = @_;
 
-    ## Fetch object
+    ## Get handle on object_id && attributes for the object
+    my $attributes = $processed_data->{$class}->{$object_id}->{'raw'};
 
-    # Is this object allready retrieved?
-    my $object = $processed_data->{$class}->{$id}->{'object'};
-    
-    # No object? - Fetch existing object from database, and store it
-    unless  ( $object ) {
-        $object = $class->retrieve($id);
-        $processed_data->{$class}->{$id}->{'object'} = $object;
+#warn("===> Inflating $class id: [$object_id] caller: ". (caller())[2] ."\n");
+#warn('ATTR: '.Dumper($attributes));
+
+    ## Create id field
+    # form_id consists of more than one id field
+    my %id_field;
+    my $form_id = $processed_data->{$class}->{$object_id}->{'form_id'};
+    if ( $form_id && $form_id =~ /;/ ) {
+        foreach my $field ( split(/;/,$form_id) ) {
+            my ($key,$value) = split(/=/,$field);
+            $id_field{$key} = $value;
+        }
     }
-
-    # Still no object?
-    unless ( $object ) {
-        $object = $class->create({});
-        $processed_data->{$class}->{$id}->{'object'} = $object;
+    # Single column id field
+    elsif ( $form_id && $form_id ne 'new' )  {
+        %id_field = ( id => $form_id );
     }
+    # Fallback to object id (if form_id is missing, it is probably a has_a
+    # where the user didn't supply the foreign object as a input parameter)
+    elsif ( !$form_id ) {
+        %id_field = ( id => $object_id );
+    }
+    #warn("ID: ".Dumper(\%id_field));
 
-    ## Process has_a references
+    ## Inflate has_a has_a references
     my @has_a_references = values %{ $class->meta_info->{'has_a'} };
     foreach my $has_a ( @has_a_references ) {
-
         my $foreign_class    = $has_a->foreign_class;
         my $foreign_accessor = $has_a->accessor->accessor;
         my $foreign_id       = $processed_data
                                ->{$class}
-                               ->{$id}
+                               ->{$object_id}
                                ->{'raw'}
                                ->{$foreign_accessor}
-                               ;
-
-        # Do not create objects that do not exist
+                             ||= $id_field{$foreign_accessor};
+#warn("*** has_a $foreign_accessor [". ($foreign_id ||'')."]");
+#warn($foreign_accessor .' '. ($attributes->{$foreign_accessor} || 'undef'));
         next unless $foreign_id;
 
         # Inflate foreign object
         my $foreign_object = $self->_inflate_object($foreign_id,
                                                     $foreign_class,
                                                     $processed_data,
-                                                    );            
-        # Store relation in current object
-        $object->$foreign_accessor($foreign_object);
+                                                    );
+        # Store inflated object in id and attribute hash
+        $attributes->{$foreign_accessor} = $foreign_object;
+        $id_field{$foreign_accessor} = $foreign_object
+            if exists($id_field{$foreign_accessor});
+    }
+    #warn('Inflated attrs: '.Dumper($attributes));
+
+    ## Fetch object
+
+    # Is this object allready retrieved?
+    my $object = $processed_data->{$class}->{$object_id}->{'object'};
+
+    # No object? - Fetch existing object from database, and store it
+    unless  ( $object ) {
+        #warn("Fetching $class object");
+        $object = $class->retrieve(%id_field) if keys %id_field;
+        $processed_data->{$class}->{$object_id}->{'object'} = $object;
     }
 
-    ## Process has_many references
-
-
-    # Build list for attributes to skip
-    my %skip;
-    foreach my $meta_type ( keys %{ $class->meta_info } ) {
-        foreach my $attr ( keys %{ $class->meta_info->{$meta_type} } ) {
-            $skip{$attr} = 1;
-        }
+    # Still no object?
+    unless ( $object ) {
+        #warn("Create: ".Dumper(\%id_field));
+        
+        $object = $class->create({%id_field});
+        $processed_data->{$class}->{$object_id}->{'object'} = $object;
     }
 
     # Store attributes
-    foreach my $attr ( keys %{$processed_data->{$class}->{$id}->{'raw'}} ) {
-        # Skip relations
-        next if exists($skip{$attr});
+    foreach my $attr ( keys %$attributes ) {
+        # Skip Dummy columns
+        next unless $attr;
 
         $object->set($attr => $processed_data
                               ->{$class}
-                              ->{$id}
+                              ->{$object_id}
                               ->{'raw'}
                               ->{$attr});
     }
-
+    #warn("<<< Inflated ".ref($object));
     return($object);
 }
 
 
 sub form_field
 {
-    my ($self,$name,$type,$options,$local_oid,$default) = @_;
+    my ($self,$name,$type,$object_id,$options,$default) = @_;
 
     croak "Field '$name' does not exist for object ".ref($self)
         unless $self->can($name);
@@ -183,8 +234,9 @@ sub form_field
     my $input;
 
     if ( $type eq 'text' || $type eq 'hidden' ) {
-        $input = $self->_form_field_common($name, $type, $options,
-                                           $local_oid, $default);
+        $input = $self->_form_field_common(
+            $name, $type, $object_id, $options, $default
+        );
     }
 
     my $markup = $input->as_XML;
@@ -196,7 +248,7 @@ sub form_field
 
 sub _form_field_common
 {
-    my ($self,$name,$type,$options,$local_oid,$default) = @_;
+    my ($self,$name,$type,$object_id,$options,$default) = @_;
 
     my $value = defined($default)   ? $default
               : ref($self)          ? $self->get($name)
@@ -205,7 +257,7 @@ sub _form_field_common
 
     my $input = HTML::Element->new(
         'input',
-        name  => $self->form_fieldname($name,$local_oid),
+        name  => $self->form_fieldname($name,$object_id),
         value => $value,
         type  => $type,
     );

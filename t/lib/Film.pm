@@ -9,11 +9,13 @@ use base 'Class::DBI::FormTools';
 
 use Location;
 
-__PACKAGE__->set_table('film');
+__PACKAGE__->set_table('films');
 __PACKAGE__->columns(Primary => 'id');
 __PACKAGE__->columns(Essential => qw[id title length comment location_id]);
 
 __PACKAGE__->has_a(location_id => 'Location');
+__PACKAGE__->has_many(roles => 'Role', 'film_id');
+
 
 sub create_sql { 
     return q{

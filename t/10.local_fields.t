@@ -21,6 +21,8 @@ my $film2 = Film->create_test_object;
 my $field_definition = qr{
     cdbi    # Prefix
     \|      # Seperator
+    [\w]+  # Object id
+    \|      # Seperator
     [\w:]+  # Classname
     \|      # Seperator
     \d+     # Id field
@@ -29,20 +31,20 @@ my $field_definition = qr{
 }x;
 
 # Validate that the fields match the definition
-like($film1->form_fieldname('title'),   $field_definition,
-     "form_fieldname: " . $film1->form_fieldname('title'));
-like($film1->form_fieldname('length'),  $field_definition,
-     "form_fieldname: " . $film1->form_fieldname('length'));
-like($film1->form_fieldname('comment'), $field_definition,
-     "form_fieldname: " . $film1->form_fieldname('comment'));
+like($film1->form_fieldname('title','o1'),   $field_definition,
+     "form_fieldname: " . $film1->form_fieldname('title','o1'));
+like($film1->form_fieldname('length','o1'),  $field_definition,
+     "form_fieldname: " . $film1->form_fieldname('length','o1'));
+like($film1->form_fieldname('comment','o1'), $field_definition,
+     "form_fieldname: " . $film1->form_fieldname('comment','o1'));
 
 # Validate html creation method
-ok($film1->form_field('title','text'),
-   "formfield: ".$film1->form_field('title','text'));
-ok($film1->form_field('length','text'),
-   "formfield: ".$film1->form_field('length','text'));
-ok($film1->form_field('comment','text'),
-   "formfield: ".$film1->form_field('comment','text'));
+ok($film1->form_field('title','text','o1'),
+   "formfield: ".$film1->form_field('title','text','o1'));
+ok($film1->form_field('length','text','o1'),
+   "formfield: ".$film1->form_field('length','text','o1'));
+ok($film1->form_field('comment','text','o1'),
+   "formfield: ".$film1->form_field('comment','text','o1'));
 
 #print $film1->form_field('title','checkbox');
 #ok('Checkbox field working');
@@ -54,29 +56,29 @@ ok($film1->form_field('comment','text'),
 # Create a form with 2 existing objects and 2 new objects
 my $formdata = {
     # The existing objects
-    $film1->form_fieldname('title')    => 'Title',
-    $film1->form_fieldname('length')   => 99,
-    $film1->form_fieldname('comment')  => 'This is a comment',
-    $film2->form_fieldname('title')    => 'Title',
-    $film2->form_fieldname('length')   => 99,
-    $film2->form_fieldname('comment')  => 'This is a comment',
+    $film1->form_fieldname('title' ,  'o1') => 'Title',
+    $film1->form_fieldname('length',  'o1') => 99,
+    $film1->form_fieldname('comment', 'o1') => 'This is a comment',
+    $film2->form_fieldname('title',   'o2') => 'Title',
+    $film2->form_fieldname('length',  'o2') => 99,
+    $film2->form_fieldname('comment', 'o2') => 'This is a comment',
 
     # The new objects
-    Film->form_fieldname('title',   1) => 'Title',
-    Film->form_fieldname('length',  1) => 99,
-    Film->form_fieldname('comment', 1) => 'This is a comment',
-    Film->form_fieldname('title',   2) => 'Title',
-    Film->form_fieldname('length',  2) => 99,
-    Film->form_fieldname('comment', 2) => 'This is a comment',
+    Film->form_fieldname('title',     'o3') => 'Title',
+    Film->form_fieldname('length',    'o3') => 99,
+    Film->form_fieldname('comment',   'o3') => 'This is a comment',
+    Film->form_fieldname('title',     'o4') => 'Title',
+    Film->form_fieldname('length',    'o4') => 99,
+    Film->form_fieldname('comment',   'o4') => 'This is a comment',
 };
 print 'Formdata: '.Dumper($formdata);
 
 # Extract all 4 objects
 my @objects = Class::DBI::FormTools->formdata_to_objects($formdata);
-ok((grep { ref($_) eq 'Film' } @objects) == 2,
+ok((grep { ref($_) eq 'Film' } @objects) == 4,
    "formdata_to_objects: Ojects extracted");
 
-print 'Final objects: '.Dumper(\@objects);
+#print 'Final objects: '.Dumper(\@objects);
 
 # Update objects
 foreach my $object ( @objects ) {
