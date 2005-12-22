@@ -35,7 +35,7 @@ my $formdata = {
 print 'Formdata: '.Dumper($formdata);
 
 my @objects = Class::DBI::FormTools->formdata_to_objects($formdata);
-ok(@objects == 3,"formdata_to_objects: Ojects extracted");
+ok(@objects == 3,"formdata_to_objects: ".scalar(@objects)." Objects extracted");
 print 'Final objects: '.Dumper(\@objects);
 
 # Update objects
