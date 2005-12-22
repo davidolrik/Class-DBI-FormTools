@@ -97,8 +97,13 @@ sub formdata_to_objects
     foreach my $formkey ( @cdbi_formkeys ) {
         my ($prefix,$object_id,$class,$id,$attribute) = split(/\|/,$formkey);
 
+        # Only store value if an attribute name exists
+        # N-M relations with no extra data in the mapping table will not have
+        # a attribute name defined. The form name will look something like
+        # this: 'cdbi|o3|Role|actor_id=o2;film_id=o1|' and the value will be
+        # discarded
         $processes_data->{$class}->{$object_id}->{'raw'}->{$attribute}
-            = $formdata->{$formkey};
+            = $formdata->{$formkey} if $attribute;
         $processes_data->{$class}->{$object_id}->{'form_id'}
             = $id;
 
@@ -202,7 +207,7 @@ sub _inflate_object
 
     # Still no object?
     unless ( $object ) {
-        #warn("Create: ".Dumper(\%id_field));
+        #warn("Create: ".Dumper(\%id_field).Dumper($attributes));
         
         $object = $class->create({
             %id_field,
@@ -274,30 +279,35 @@ __END__
 
 =head1 NAME
 
-Class::DBI::FormTools - [One line description of module's purpose here]
-
+Class::DBI::FormTools - Build forms with multiple interconnected objects.
 
 =head1 VERSION
 
-This document describes Class::DBI::FormTools version 0.0.1
+This document describes Class::DBI::FormTools version 0.0.3
 
 
 =head1 SYNOPSIS
 
-    use Class::DBI::FormTools;
+    package MyApp::Film;
+    use base 'Class::DBI::FormTools';
 
-=for author to fill in:
-    Brief code example(s) here showing commonest usage(s).
-    This section will be as far as many users bother reading
-    so make it as educational and exeplary as possible.
-  
-  
+=head2 Mason example
+
+    <%init>
+    my $o = Film->retrieve(42);
+    </%init>
+    <form>
+        <input name="<% $o->form_fieldname('title') %>" type="text" value="<% $o->title %>" />
+    </form>
+
+    On the receiving end:
+
+    my @objects = Class::DBI::FormTools->formdata_to_objects($quesrstring);
+
+
 =head1 DESCRIPTION
 
-=for author to fill in:
-    Write a full description of the module and its features here.
-    Use subsections (=head2, =head3) as appropriate.
-
+Alpha software - Highly experimental - Everything might change ;)
 
 =head1 INTERFACE 
 
@@ -324,52 +334,15 @@ FIXME
 =back
 
 
-=head1 DIAGNOSTICS
-
-=for author to fill in:
-    List every single error and warning message that the module can
-    generate (even the ones that will "never happen"), with a full
-    explanation of each problem, one or more likely causes, and any
-    suggested remedies.
-
-=over
-
-=item C<< Error message here, perhaps with %s placeholders >>
-
-[Description of error here]
-
-=item C<< Another error message here >>
-
-[Description of error here]
-
-[Et cetera, et cetera]
-
-=back
-
-
 =head1 CONFIGURATION AND ENVIRONMENT
 
-=for author to fill in:
-    A full explanation of any configuration system(s) used by the
-    module, including the names and locations of any configuration
-    files, and the meaning of any environment variables or properties
-    that can be set. These descriptions must also include details of any
-    configuration language used.
-  
 Class::DBI::FormTools requires no configuration files or environment
 variables.
 
 
 =head1 DEPENDENCIES
 
-=for author to fill in:
-    A list of all the other modules that this module relies upon,
-    including any restrictions on versions, and an indication whether
-    the module is part of the standard Perl distribution, part of the
-    module's distribution, or must be installed separately. ]
-
-None.
-
+Class::DBI
 
 =head1 INCOMPATIBILITIES
 
