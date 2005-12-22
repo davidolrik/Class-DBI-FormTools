@@ -204,7 +204,10 @@ sub _inflate_object
     unless ( $object ) {
         #warn("Create: ".Dumper(\%id_field));
         
-        $object = $class->create({%id_field});
+        $object = $class->create({
+            %id_field,
+            %$attributes,
+        });
         $processed_data->{$class}->{$object_id}->{'object'} = $object;
     }
 
