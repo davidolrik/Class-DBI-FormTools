@@ -8,8 +8,9 @@ my $builder = Module::Build->new(
     dist_author         => 'David Jack Olrik <david@olrik.dk>',
     dist_version_from   => 'lib/Class/DBI/FormTools.pm',
     requires => {
-        'Test::More' => 0,
-        'version'    => 0,
+        'Test::More'    => 0,
+        'version'       => 0,
+        'HTML::Element' => 0,
     },
     add_to_cleanup      => [ 'Class-DBI-FormTools-*' ],
 );
