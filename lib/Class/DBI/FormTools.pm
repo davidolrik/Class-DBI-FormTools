@@ -1,6 +1,6 @@
 package Class::DBI::FormTools;
 
-use version; $VERSION = qv('0.0.6');
+our $VERSION = '0.000007';
 
 use strict;
 use warnings;
@@ -8,18 +8,6 @@ use warnings;
 use Carp;
 
 use HTML::Element;
-use Data::Dumper;
-
-# Other recommended modules (uncomment to use):
-#  use IO::Prompt;
-#  use Perl6::Export;
-#  use Perl6::Slurp;
-#  use Perl6::Say;
-#  use Regexp::Autoflags;
-
-
-# Module implementation here
-
 
 sub form_fieldname
 {
@@ -117,8 +105,6 @@ sub formdata_to_objects
 
     # Flatten todo hash into a todolist array
     my @todolist = values %todolist;
-    #warn('TODOLIST: '.Dumper(\@todolist));
-    #warn('FORMDATA: '.Dumper($processes_data));
 
     # Build objects from form data
     my @objects;
@@ -142,9 +128,6 @@ sub _inflate_object
     ## Get handle on object_id && attributes for the object
     my $attributes = $processed_data->{$class}->{$object_id}->{'raw'};
 
-#warn("===> Inflating $class id: [$object_id] caller: ". (caller())[2] ."\n");
-#warn('ATTR: '.Dumper($attributes));
-
     ## Create id field
     # form_id consists of more than one id field
     my %id_field;
@@ -164,7 +147,6 @@ sub _inflate_object
     elsif ( !$form_id ) {
         %id_field = ( id => $object_id );
     }
-    #warn("ID: ".Dumper(\%id_field));
 
     ## Inflate has_a has_a references
     my @has_a_references = values %{ $class->meta_info->{'has_a'} };
@@ -177,8 +159,7 @@ sub _inflate_object
                                ->{'raw'}
                                ->{$foreign_accessor}
                              ||= $id_field{$foreign_accessor};
-#warn("*** has_a $foreign_accessor [". ($foreign_id ||'')."]");
-#warn($foreign_accessor .' '. ($attributes->{$foreign_accessor} || 'undef'));
+
         next unless $foreign_id;
 
         # Inflate foreign object
@@ -191,7 +172,6 @@ sub _inflate_object
         $id_field{$foreign_accessor} = $foreign_object
             if exists($id_field{$foreign_accessor});
     }
-    #warn('Inflated attrs: '.Dumper($attributes));
 
     ## Fetch object
 
@@ -207,8 +187,6 @@ sub _inflate_object
 
     # Still no object?
     unless ( $object ) {
-        #warn("Create: ".Dumper(\%id_field).Dumper($attributes));
-        
         $object = $class->create({
             %id_field,
             %$attributes,
@@ -381,7 +359,7 @@ David Jack Olrik  C<< <david@olrik.dk> >>
 
 =head1 LICENCE AND COPYRIGHT
 
-Copyright (c) 2005-2008, David Jack Olrik C<< <david@olrik.dk> >>.
+Copyright (c) 2005-2010, David Jack Olrik C<< <david@olrik.dk> >>.
 All rights reserved.
 
 This module is free software; you can redistribute it and/or

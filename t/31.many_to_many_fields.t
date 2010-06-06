@@ -1,5 +1,5 @@
 use Test::More;
-use Data::Dumper;
+use Data::Dump 'pp';
 
 BEGIN {
 	eval "use DBD::SQLite";
@@ -29,11 +29,11 @@ my $formdata = {
     }) => 'Test',
     Actor->form_fieldname('name',   'o2') => 'Test actor',
 };
-print 'Formdata: '.Dumper($formdata);
+print 'Formdata: '.pp($formdata)."\n";
 
 my @objects = Class::DBI::FormTools->formdata_to_objects($formdata);
 ok(@objects == 3,"formdata_to_objects: Ojects extracted");
-print 'Final objects: '.Dumper(\@objects);
+print 'Final objects: '.pp(\@objects)."\n";
 
 # Update objects
-map { $_->update || diag("Unable to update object ".Dumper($_)) } @objects;
+map { $_->update || diag("Unable to update object ".pp($_)) } @objects;

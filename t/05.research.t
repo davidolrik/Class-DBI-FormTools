@@ -1,5 +1,5 @@
 use Test::More;
-use Data::Dumper;
+use Data::Dump 'pp';
 
 BEGIN {
     plan skip_all => 'Nothing to test here';

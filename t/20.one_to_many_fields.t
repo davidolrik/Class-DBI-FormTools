@@ -1,5 +1,5 @@
 use Test::More;
-use Data::Dumper;
+use Data::Dump 'pp';
 
 BEGIN {
 	eval "use DBD::SQLite";
@@ -28,7 +28,7 @@ my $formdata = {
     $film->form_fieldname('comment',     'o1') => 'This is a comment',
     $film->form_fieldname('location_id', 'o1') => $location->id,
 };
-print 'Formdata: '.Dumper($formdata);
+print 'Formdata: '.pp($formdata)."\n";
 
 
 my @objects = Class::DBI::FormTools->formdata_to_objects($formdata);
@@ -37,6 +37,6 @@ ok(@objects == 1
    "formdata_to_objects: Existing object with existing relation"
    );
 
-print 'Final objects: '.Dumper(\@objects);
+print 'Final objects: '.pp(\@objects)."\n";
 
 ok(map { $_->update } @objects);

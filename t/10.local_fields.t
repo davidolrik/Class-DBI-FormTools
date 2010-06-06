@@ -1,5 +1,5 @@
 use Test::More;
-use Data::Dumper;
+use Data::Dump 'pp';
 
 BEGIN {
 	eval "use DBD::SQLite";
@@ -71,14 +71,14 @@ my $formdata = {
     Film->form_fieldname('length',    'o4') => 99,
     Film->form_fieldname('comment',   'o4') => 'This is a comment',
 };
-print 'Formdata: '.Dumper($formdata);
+print 'Formdata: '.pp($formdata)."\n";
 
 # Extract all 4 objects
 my @objects = Class::DBI::FormTools->formdata_to_objects($formdata);
-ok((grep { ref($_) eq 'Film' } @objects) == 4,
-   "formdata_to_objects: Ojects extracted");
-
-#print 'Final objects: '.Dumper(\@objects);
+ok(
+    (grep { ref($_) eq 'Film' } @objects) == 4,
+    "formdata_to_objects: Ojects extracted " . pp(\@objects)
+);
 
 # Update objects
 foreach my $object ( @objects ) {
